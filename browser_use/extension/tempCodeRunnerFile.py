@@ -1,0 +1,1 @@
+Handles incoming WebSocket connections from the extensio
