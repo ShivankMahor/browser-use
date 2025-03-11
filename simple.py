@@ -1,11 +1,15 @@
 import asyncio
-
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from browser_use.browser.browser import Browser, BrowserConfig
 from browser_use import Agent
+import os
 
-load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY")
+task = os.getenv("TASK")
+if not api_key:
+    raise ValueError("OPENAI_API_KEY is not set!")
+if not task:
+    raise ValueError("Task is not given!")
 
 # Initialize the model
 llm = ChatOpenAI(
@@ -20,7 +24,6 @@ browser = Browser(
 				chrome_instance_path='C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
 		)
 	)
-task = 'Find the founders of browser-use'
 
 agent = Agent(task=task, llm=llm, browser=browser)
 
