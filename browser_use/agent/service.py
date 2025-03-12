@@ -60,17 +60,17 @@ def log_response(response: AgentOutput) -> None:
 	"""Utility function to log the model's response."""
 
 	if 'Success' in response.current_state.evaluation_previous_goal:
-		emoji = '👍'
+		emoji = ''
 	elif 'Failed' in response.current_state.evaluation_previous_goal:
-		emoji = '⚠'
+		emoji = ''
 	else:
-		emoji = '🤷'
+		emoji = ''
 
 	logger.info(f'{emoji} Eval: {response.current_state.evaluation_previous_goal}')
-	logger.info(f'🧠 Memory: {response.current_state.memory}')
-	logger.info(f'🎯 Next goal: {response.current_state.next_goal}')
+	logger.info(f' Memory: {response.current_state.memory}')
+	logger.info(f' Next goal: {response.current_state.next_goal}')
 	for i, action in enumerate(response.action):
-		logger.info(f'🛠️  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}')
+		logger.info(f'  Action {i + 1}/{len(response.action)}: {action.model_dump_json(exclude_unset=True)}')
 
 
 Context = TypeVar('Context')
@@ -324,7 +324,7 @@ class Agent(Generic[Context]):
 	@time_execution_async('--step (agent)')
 	async def step(self, step_info: Optional[AgentStepInfo] = None) -> None:
 		"""Execute one step of the task"""
-		logger.info(f'📍 Step {self.state.n_steps}')
+		logger.info(f' Step {self.state.n_steps}')
 		state = None
 		model_output = None
 		result: list[ActionResult] = []
@@ -384,7 +384,7 @@ class Agent(Generic[Context]):
 			self.state.last_result = result
 
 			if len(result) > 0 and result[-1].is_done:
-				logger.info(f'📄 Result: {result[-1].extracted_content}')
+				logger.info(f' Result: {result[-1].extracted_content}')
 
 			self.state.consecutive_failures = 0
 
@@ -429,7 +429,7 @@ class Agent(Generic[Context]):
 		"""Handle all types of errors that can occur during a step"""
 		include_trace = logger.isEnabledFor(logging.DEBUG)
 		error_msg = AgentError.format_error(error, include_trace=include_trace)
-		prefix = f'❌ Result failed {self.state.consecutive_failures + 1}/{self.settings.max_failures} times:\n '
+		prefix = f' Result failed {self.state.consecutive_failures + 1}/{self.settings.max_failures} times:\n '
 
 		if isinstance(error, (ValidationError, ValueError)):
 			logger.error(f'{prefix}{error_msg}')
@@ -536,7 +536,7 @@ class Agent(Generic[Context]):
 
 	def _log_agent_run(self) -> None:
 		"""Log the agent run"""
-		logger.info(f'🚀 Starting task: {self.task}')
+		logger.info(f' Starting task: {self.task}')
 
 		logger.debug(f'Version: {self.version}, Source: {self.source}')
 		self.telemetry.capture(
@@ -587,7 +587,7 @@ class Agent(Generic[Context]):
 			for step in range(max_steps):
 				# Check if we should stop due to too many failures
 				if self.state.consecutive_failures >= self.settings.max_failures:
-					logger.error(f'❌ Stopping due to {self.settings.max_failures} consecutive failures')
+					logger.error(f' Stopping due to {self.settings.max_failures} consecutive failures')
 					break
 
 				# Check control flags before each step
@@ -611,7 +611,7 @@ class Agent(Generic[Context]):
 					await self.log_completion()
 					break
 			else:
-				logger.info('❌ Failed to complete task in maximum steps')
+				logger.info(' Failed to complete task in maximum steps')
 
 			return self.state.history
 		finally:
@@ -727,20 +727,20 @@ class Agent(Generic[Context]):
 		parsed: ValidationResult = response['parsed']
 		is_valid = parsed.is_valid
 		if not is_valid:
-			logger.info(f'❌ Validator decision: {parsed.reason}')
+			logger.info(f' Validator decision: {parsed.reason}')
 			msg = f'The output is not yet correct. {parsed.reason}.'
 			self.state.last_result = [ActionResult(extracted_content=msg, include_in_memory=True)]
 		else:
-			logger.info(f'✅ Validator decision: {parsed.reason}')
+			logger.info(f' Validator decision: {parsed.reason}')
 		return is_valid
 
 	async def log_completion(self) -> None:
 		"""Log the completion of the task"""
-		logger.info('✅ Task completed')
+		logger.info(' Task completed')
 		if self.state.history.is_successful():
-			logger.info('✅ Successfully')
+			logger.info(' Successfully')
 		else:
-			logger.info('❌ Unfinished')
+			logger.info(' Unfinished')
 
 		if self.register_done_callback:
 			await self.register_done_callback(self.state.history)
@@ -873,17 +873,17 @@ class Agent(Generic[Context]):
 
 	def pause(self) -> None:
 		"""Pause the agent before the next step"""
-		logger.info('🔄 pausing Agent ')
+		logger.info(' pausing Agent ')
 		self.state.paused = True
 
 	def resume(self) -> None:
 		"""Resume the agent"""
-		logger.info('▶️ Agent resuming')
+		logger.info(' Agent resuming')
 		self.state.paused = False
 
 	def stop(self) -> None:
 		"""Stop the agent"""
-		logger.info('⏹️ Agent stopping')
+		logger.info(' Agent stopping')
 		self.state.stopped = True
 
 	def _convert_initial_actions(self, actions: List[Dict[str, Dict[str, Any]]]) -> List[ActionModel]:
