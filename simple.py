@@ -1,8 +1,11 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import asyncio
 from langchain_openai import ChatOpenAI
-from browser_use.browser.browser import Browser, BrowserConfig
 from browser_use import Agent
-import os
+from browser_use.browser.browser import Browser, BrowserConfig
 
 api_key = os.getenv("OPENAI_API_KEY")
 task = os.getenv("TASK")
