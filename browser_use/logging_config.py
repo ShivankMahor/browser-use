@@ -57,76 +57,68 @@ def addLoggingLevel(levelName, levelNum, methodName=None):
 	setattr(logging.getLoggerClass(), methodName, logForLevel)
 	setattr(logging, methodName, logToRoot)
 
-
 def setup_logging():
-	# Try to add RESULT level, but ignore if it already exists
-	try:
-		addLoggingLevel('RESULT', 35)  # This allows ERROR, FATAL and CRITICAL
-	except AttributeError:
-		pass  # Level already exists, which is fine
+    # Try to add RESULT level, but ignore if it already exists
+    try:
+        addLoggingLevel('RESULT', 35)  # This allows ERROR, FATAL, and CRITICAL
+    except AttributeError:
+        pass  # Level already exists, which is fine
 
-	log_type = os.getenv('BROWSER_USE_LOGGING_LEVEL', 'info').lower()
+    log_type = os.getenv('BROWSER_USE_LOGGING_LEVEL', 'info').lower()
 
-	# Check if handlers are already set up
-	if logging.getLogger().hasHandlers():
-		return
+    # Check if handlers are already set up
+    if logging.getLogger().hasHandlers():
+        return
 
-	# Clear existing handlers
-	root = logging.getLogger()
-	root.handlers = []
+    # Clear existing handlers
+    root = logging.getLogger()
+    root.handlers = []
 
-	class BrowserUseFormatter(logging.Formatter):
-		def format(self, record):
-			if type(record.name) == str and record.name.startswith('browser_use.'):
-				record.name = record.name.split('.')[-2]
-			return super().format(record)
+    class BrowserUseFormatter(logging.Formatter):
+        def format(self, record):
+            if isinstance(record.name, str) and record.name.startswith('browser_use.'):
+                record.name = record.name.split('.')[-2]
+            return super().format(record)
 
-	# Setup single handler for all loggers
-	console = logging.StreamHandler(sys.stdout)
+    # Set up single handler for all loggers
+    console = logging.StreamHandler(sys.stdout)
+    
+    # **Fix: Ensure UTF-8 encoding**
+    sys.stdout.reconfigure(encoding='utf-8')
 
-	# adittional setLevel here to filter logs
-	if log_type == 'result':
-		console.setLevel('RESULT')
-		console.setFormatter(BrowserUseFormatter('%(message)s'))
-	else:
-		console.setFormatter(BrowserUseFormatter('%(levelname)-8s [%(name)s] %(message)s'))
+    if log_type == 'result':
+        console.setLevel('RESULT')
+        console.setFormatter(BrowserUseFormatter('%(message)s'))
+    else:
+        console.setFormatter(BrowserUseFormatter('%(levelname)-8s [%(name)s] %(message)s'))
 
-	# Configure root logger only
-	root.addHandler(console)
+    # Configure root logger only
+    root.addHandler(console)
 
-	# switch cases for log_type
-	if log_type == 'result':
-		root.setLevel('RESULT')  # string usage to avoid syntax error
-	elif log_type == 'debug':
-		root.setLevel(logging.DEBUG)
-	else:
-		root.setLevel(logging.INFO)
+    # Switch cases for log_type
+    if log_type == 'result':
+        root.setLevel('RESULT')
+    elif log_type == 'debug':
+        root.setLevel(logging.DEBUG)
+    else:
+        root.setLevel(logging.INFO)
 
-	# Configure browser_use logger
-	browser_use_logger = logging.getLogger('browser_use')
-	browser_use_logger.propagate = False  # Don't propagate to root logger
-	browser_use_logger.addHandler(console)
-	browser_use_logger.setLevel(root.level)  # Set same level as root logger
+    # Configure browser_use logger
+    browser_use_logger = logging.getLogger('browser_use')
+    browser_use_logger.propagate = False  # Don't propagate to root logger
+    browser_use_logger.addHandler(console)
+    browser_use_logger.setLevel(root.level)  # Set same level as root logger
 
-	logger = logging.getLogger('browser_use')
-	logger.info('BrowserUse logging setup complete with level %s', log_type)
-	# Silence third-party loggers
-	for logger in [
-		'WDM',
-		'httpx',
-		'selenium',
-		'playwright',
-		'urllib3',
-		'asyncio',
-		'langchain',
-		'openai',
-		'httpcore',
-		'charset_normalizer',
-		'anthropic._base_client',
-		'PIL.PngImagePlugin',
-		'trafilatura.htmlprocessing',
-		'trafilatura',
-	]:
-		third_party = logging.getLogger(logger)
-		third_party.setLevel(logging.ERROR)
-		third_party.propagate = False
+    logger = logging.getLogger('browser_use')
+    logger.info('BrowserUse logging setup complete with level %s', log_type)
+
+    # Silence third-party loggers
+    for logger_name in [
+        'WDM', 'httpx', 'selenium', 'playwright', 'urllib3', 'asyncio',
+        'langchain', 'openai', 'httpcore', 'charset_normalizer',
+        'anthropic._base_client', 'PIL.PngImagePlugin',
+        'trafilatura.htmlprocessing', 'trafilatura'
+    ]:
+        third_party = logging.getLogger(logger_name)
+        third_party.setLevel(logging.ERROR)
+        third_party.propagate = False
