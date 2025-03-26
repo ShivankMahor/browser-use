@@ -30,6 +30,11 @@ if not profile:
 else:
     print(f"Using profile: {profile}")
 
+extend_system_message = (
+	'REMEMBER the most important RULES: '
+    '1. if you need login credentials, payment details , OTP, or any other user specific information then always wait for user to input login details manually!!!'
+    '2. if the agent is repeating same steps again and again and failing then always wait for user to intervene'
+)
 # Get Chrome user data directory based on OS
 def get_chrome_user_data_dir():
     if os.name == 'nt':  # Windows
@@ -59,7 +64,7 @@ browser = Browser(
     )
 )
 
-agent = Agent(task=task, llm=llm, browser=browser)
+agent = Agent(task=task, llm=llm, browser=browser, extend_system_message=extend_system_message)
 
 # Thread-safe control flags
 is_paused = threading.Event()
