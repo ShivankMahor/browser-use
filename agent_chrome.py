@@ -32,7 +32,7 @@ else:
 
 extend_system_message = (
 	'REMEMBER the most important RULES: '
-    '1. if you need login credentials, payment details , OTP, or any other user specific information then always wait for user to input login details manually!!!'
+    '1. if you need login credentials, payment details , OTP, or any other user specific information then always call wait 16 seconds so user can input login details dont not input details by yourself!!!'
     '2. if the agent is repeating same steps again and again and failing then always wait for user to intervene'
 )
 # Get Chrome user data directory based on OS

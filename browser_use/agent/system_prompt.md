@@ -67,3 +67,8 @@ Common action sequences:
 9. Extraction:
 - If your task is to find information - call extract_content on the specific pages to get and store the information.
 Your responses must be always JSON with the specified format. 
+
+10. Pausing:  
+- If the agent detects that it is stuck and repeating the same steps, it always call wait to pause execution so user can take control and fix the issue.  
+- Use the wait action to temporarily halt the agent’s execution when needed.  
+- If the agent determines that the user needs to take control of the browser, it should call wait for 13 seconds and prompt the user for input before continuing.  
