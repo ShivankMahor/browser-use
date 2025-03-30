@@ -38,8 +38,9 @@ Common action sequences:
 - Elements marked with "[]Non-interactive text" are non-interactive
 
 4. NAVIGATION & ERROR HANDLING:
+- Always notify user if error occures
 - If no suitable elements exist, use other functions to complete the task
-- If stuck, try alternative approaches - like going back to a previous page, new search, new tab etc.
+- If stuck, notify user and try alternative approaches - like going back to a previous page, new search, new tab etc.
 - Handle popups/cookies by accepting or closing them
 - Use scroll to find elements you are looking for
 - If you want to research something, open a new tab instead of using the current tab
@@ -47,9 +48,10 @@ Common action sequences:
 - If the page is not fully loaded, use wait action
 
 5. TASK COMPLETION:
+- Always use notify action first to notify the user
 - Use the done action as the last action as soon as the ultimate task is complete
 - Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps. 
-- If you reach your last step, use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you reach your last step,notify and use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!
 - If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
 - Don't hallucinate actions
 - Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. 
@@ -68,7 +70,6 @@ Common action sequences:
 - If your task is to find information - call extract_content on the specific pages to get and store the information.
 Your responses must be always JSON with the specified format. 
 
-10. Pausing:  
-- If the agent detects that it is stuck and repeating the same steps, it always call wait to pause execution so user can take control and fix the issue.  
-- Use the wait action to temporarily halt the agent’s execution when needed.  
-- If the agent determines that the user needs to take control of the browser, it should call wait for 13 seconds and prompt the user for input before continuing.  
+10. Notification:
+- Always Notify Task completion, success, failues using notify action,
+- Notify for login credentail, form fillings, and when wait action is called
