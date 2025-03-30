@@ -31,9 +31,10 @@ else:
     print(f"Using profile: {profile}")
 
 extend_system_message = (
-	'REMEMBER the most important RULES: '
-    '1. if you need login credentials, payment details , OTP, or any other user specific information then always call wait 16 seconds so user can input login details dont not input details by yourself!!!'
-    '2. if the agent is repeating same steps again and again and failing then always wait for user to intervene'
+	'REMEMBER the most important RULES:'
+    '1. Notify the user when task is completed'
+    '2. if you need login credentials, payment details , OTP, or any other user specific information then always calls notify and wait 16 seconds so user can input login details dont not input details by yourself!!!'
+    '3. if the agent is repeating same steps again and again and failing then always wait for user to intervene'
 )
 # Get Chrome user data directory based on OS
 def get_chrome_user_data_dir():
@@ -50,7 +51,7 @@ llm = ChatOpenAI(
     temperature=0.0,
 )
 controller = Controller()
-@controller.registry.action('Notify the user')
+@controller.registry.action('Notify the user with a message')
 def notify(msg: str):
     if notification.notify is None:
         print("Error: notification.notify is None!")
@@ -61,7 +62,7 @@ def notify(msg: str):
         message=msg,
         timeout=20
     )
-    return ActionResult(extracted_content=msg, include_in_memory=True)
+    return ActionResult(extracted_content="Notified the user with msg :"+msg, include_in_memory=True)
 # Get the user data directory
 user_data_dir = get_chrome_user_data_dir()
 
@@ -76,7 +77,7 @@ browser = Browser(
     )
 )
 
-agent = Agent(task=task, llm=llm, browser=browser,controller=controller, extend_system_message=extend_system_message)
+agent = Agent(task=task, llm=llm, browser=browser,controller=controller, extend_system_message=extend_system_message, planner_llm=llm)
 
 # Thread-safe control flags
 is_paused = threading.Event()

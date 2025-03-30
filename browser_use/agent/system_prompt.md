@@ -71,5 +71,5 @@ Common action sequences:
 Your responses must be always JSON with the specified format. 
 
 10. Notification:
-- Always Notify Task completion, success, failues using notify action,
+- Always Notify the user for Task completion, success and failues using notify action,
 - Notify for login credentail, form fillings, and when wait action is called
