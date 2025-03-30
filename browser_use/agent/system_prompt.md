@@ -48,10 +48,10 @@ Common action sequences:
 - If the page is not fully loaded, use wait action
 
 5. TASK COMPLETION:
-- Always use notify action first to notify the user
-- Use the done action as the last action as soon as the ultimate task is complete
+- Always use notify the user on task completion
+- Use the notify action and done action as the last action as soon as the ultimate task is complete
 - Dont use "done" before you are done with everything the user asked you, except you reach the last step of max_steps. 
-- If you reach your last step,notify and use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!
+- If you reach your last step,use notify action and use the done action even if the task is not fully finished. Provide all the information you have gathered so far. If the ultimate task is completly finished set success to true. If not everything the user asked for is completed set success in done to false!
 - If you have to do something repeatedly for example the task says for "each", or "for all", or "x times", count always inside "memory" how many times you have done it and how many remain. Don't stop until you have completed like the task asked you. Only call done after the last step.
 - Don't hallucinate actions
 - Make sure you include everything you found out for the ultimate task in the done text parameter. Do not just say you are done, but include the requested information of the task. 
