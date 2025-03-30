@@ -1,12 +1,12 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+from plyer import notification
 import asyncio
 import threading
 import time
 from langchain_openai import ChatOpenAI
-from browser_use import Agent
+from browser_use import Agent, Controller, ActionResult
 from browser_use.browser.browser import Browser, BrowserConfig
 
 # Get environment variables from the Electron app
@@ -49,7 +49,19 @@ llm = ChatOpenAI(
     model='gpt-4o',
     temperature=0.0,
 )
-
+controller = Controller()
+@controller.registry.action('Notify the user')
+def notify(msg: str):
+    if notification.notify is None:
+        print("Error: notification.notify is None!")
+        return
+    
+    notification.notify(
+        title="Alert",
+        message=msg,
+        timeout=20
+    )
+    return ActionResult(extracted_content=msg, include_in_memory=True)
 # Get the user data directory
 user_data_dir = get_chrome_user_data_dir()
 
@@ -64,7 +76,7 @@ browser = Browser(
     )
 )
 
-agent = Agent(task=task, llm=llm, browser=browser, extend_system_message=extend_system_message)
+agent = Agent(task=task, llm=llm, browser=browser,controller=controller, extend_system_message=extend_system_message)
 
 # Thread-safe control flags
 is_paused = threading.Event()
