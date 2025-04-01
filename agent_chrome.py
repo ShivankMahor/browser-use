@@ -1,149 +1,225 @@
-import sys
 import os
+import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from plyer import notification
 import asyncio
 import threading
 import time
+from plyer import notification
 from langchain_openai import ChatOpenAI
 from browser_use import Agent, Controller, ActionResult
 from browser_use.browser.browser import Browser, BrowserConfig
 
-# Get environment variables from the Electron app
-api_key = os.getenv("OPENAI_API_KEY")
-task = os.getenv("TASK")
-profile = os.getenv("PROFILE_DIR")  # This is passed from the Electron app
 
-print(task, profile)
+class AgentController:
+    def __init__(self, initial_task=None, profile_dir=None):
+        # Get environment variables
+        api_key = os.getenv("OPENAI_API_KEY")
+        env_task = os.getenv("TASK")
+        env_profile = os.getenv("PROFILE_DIR")
+        
+        # Check for API key
+        if not api_key:
+            print("Error: OPENAI_API_KEY is not set!")
+            sys.exit(1)
+        
+        # Determine task priority: parameter > environment variable > default
+        if initial_task:
+            task = initial_task
+        elif env_task:
+            task = env_task
+            print(f"Using task from environment: {task}")
+        else:
+            print("Error: No task provided and TASK environment variable is not set!")
+            sys.exit(1)
+        
+        # Determine profile priority: parameter > environment variable > default
+        if profile_dir:
+            profile = profile_dir
+        elif env_profile:
+            profile = env_profile
+            print(f"Using profile from environment: {profile}")
+        else:
+            profile = "Default"
+            print("Warning: PROFILE_DIR is not set, using Default profile")
+        
+        # Initialize LLM
+        llm = ChatOpenAI(model='gpt-4o')
+        
+        # System message for guidance
+        extend_system_message = (
+            'REMEMBER the most important RULES:\n'
+            '1. Always Notify the user when task is completed\n'
+            '2. If you need login credentials, payment details, OTP, or any other user-specific information, always notify and wait\n'
+            '3. If the agent is failing repeatedly, wait for user intervention'
+        )
+        
+        # Browser configuration
+        browser_config = self._setup_browser_config(profile)
+        browser = Browser(config=browser_config)
+        
+        # Controller setup
+        controller = Controller()
+        @controller.registry.action('Notify the user with a message')
+        def notify(msg: str):
+            if notification.notify is None:
+                print("Error: notification.notify is None!")
+                return
+            
+            notification.notify(
+                title="Alert",
+                message=msg,
+                timeout=20
+            )
+            return ActionResult(extracted_content="Notified the user with msg :"+msg, include_in_memory=True)
+        # Initialize agent
+        self.agent = Agent(
+            task=task,
+            llm=llm,
+            browser=browser,
+            controller=controller,
+            extend_system_message=extend_system_message,
+            planner_llm=llm
+        )
+        
+        # Control flags
+        self.running = False
+        self.is_paused = threading.Event()
+        self.is_stopped = threading.Event()
+        self.task_status = None
+        self.agent_thread = None
 
-if not api_key:
-    print("Error: OPENAI_API_KEY is not set!")
-    sys.exit(1)
+    def _setup_browser_config(self, profile):
+        """Set up the browser configuration based on OS and profile"""
+        # Get Chrome user data directory
+        if os.name == 'nt':  # Windows
+            user_data_dir = os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Google', 'Chrome', 'User Data')
+            chrome_path = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+        elif sys.platform == 'darwin':  # macOS
+            user_data_dir = os.path.expanduser('~/Library/Application Support/Google/Chrome')
+            chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        else:  # Linux
+            user_data_dir = os.path.expanduser('~/.config/google-chrome')
+            chrome_path = '/usr/bin/google-chrome'
+        
+        # Configure browser
+        return BrowserConfig(
+            chrome_instance_path=chrome_path,
+            extra_chromium_args=[
+                f"--user-data-dir={user_data_dir}",
+                f"--profile-directory={profile}"
+            ]
+        )
 
-if not task:
-    print("Error: TASK is not set!")
-    sys.exit(1)
-
-if not profile:
-    print("Warning: PROFILE is not set, using Default profile")
-    profile = "Default"
-else:
-    print(f"Using profile: {profile}")
-
-extend_system_message = (
-	'REMEMBER the most important RULES:'
-    '1. Notify the user when task is completed'
-    '2. if you need login credentials, payment details , OTP, or any other user specific information then always calls notify and wait 16 seconds so user can input login details dont not input details by yourself!!!'
-    '3. if the agent is repeating same steps again and again and failing then always wait for user to intervene'
-)
-# Get Chrome user data directory based on OS
-def get_chrome_user_data_dir():
-    if os.name == 'nt':  # Windows
-        return os.path.join(os.environ['LOCALAPPDATA'], 'Google', 'Chrome', 'User Data')
-    elif sys.platform == 'darwin':  # macOS
-        return os.path.expanduser('~/Library/Application Support/Google/Chrome')
-    else:  # Linux
-        return os.path.expanduser('~/.config/google-chrome')
-
-# Initialize the model
-llm = ChatOpenAI(
-    model='gpt-4o',
-    temperature=0.0,
-)
-controller = Controller()
-@controller.registry.action('Notify the user with a message')
-def notify(msg: str):
-    if notification.notify is None:
-        print("Error: notification.notify is None!")
-        return
-    
-    notification.notify(
-        title="Alert",
-        message=msg,
-        timeout=20
-    )
-    return ActionResult(extracted_content="Notified the user with msg :"+msg, include_in_memory=True)
-# Get the user data directory
-user_data_dir = get_chrome_user_data_dir()
-
-# Initialize browser with profile configuration
-browser = Browser(
-    config=BrowserConfig(
-        chrome_instance_path='C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' if os.name == 'nt' else '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        extra_chromium_args=[
-            f"--user-data-dir={user_data_dir}",
-            f"--profile-directory={profile}"
-        ]
-    )
-)
-
-agent = Agent(task=task, llm=llm, browser=browser,controller=controller, extend_system_message=extend_system_message, planner_llm=llm)
-
-# Thread-safe control flags
-is_paused = threading.Event()
-is_stopped = threading.Event()
-
-task_status = None
-async def agent_runner():
-    """ Continuously runs the agent while respecting pause and stop commands """
-    try:
-        while not is_stopped.is_set():
-            if is_paused.is_set():
-                await asyncio.sleep(1)  # Wait while paused
-                continue
-            task_status = await agent.run()  # Run agent step
-            print("task_status:",task_status)
-            if task_status:
-                print('if task_status:')
-                print("task_status.is_done():", task_status.is_done())
-                if task_status.is_done():
-                    print("inside isDone()")
-                    is_stopped.set()
-                    print("Final Result: ",task_status.final_result())
-                    print("Exiting the process now...")
+    async def run_agent(self):
+        """Run the agent with pause/stop capabilities"""
+        self.running = True
+        self.is_stopped.clear()
+        self.is_paused.clear()
+        
+        try:
+            while not self.is_stopped.is_set():
+                if self.is_paused.is_set():
+                    await asyncio.sleep(0.5)  # Reduced sleep time for responsiveness
+                    continue
+                
+                self.task_status = await self.agent.run()
+                print(f"Task status: {self.task_status}")
+                
+                if self.task_status and hasattr(self.task_status, 'is_done') and self.task_status.is_done():
+                    print("✅ Task completed", self.task_status)
                     sys.stdout.flush()  # Ensure all output is sent before exiting
                     os._exit(0)
-                else : 
-                    print("outside, task_status.finalResult()",task_status.final_result() )
-                    is_stopped.set()
-            else: print("outside the if task_status : ",task_status)
+        except Exception as e:
+            print(f"Error during automation: {str(e)}")
+            self.running = False
+            self.is_stopped.set()
 
-        print("Agent has stopped. task_status =", task_status)
-    except Exception as e:
-        print(f"Error during automation: {str(e)}")
-        sys.exit(1)
+    def start(self):
+        """Start the agent in a separate thread"""
+        if self.agent_thread and self.agent_thread.is_alive():
+            print("Agent is already running")
+            return
+            
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.run_agent())
 
-def start_agent():
-    """ Runs the agent in a separate event loop """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(agent_runner())
+    def pause(self):
+        """Pause the agent"""
+        self.is_paused.set()
+        if hasattr(self.agent, 'pause'):
+            self.agent.pause()
 
-# Start the agent in a separate thread
-thread = threading.Thread(target=start_agent, daemon=True)
-thread.start()
+    def resume(self):
+        """Resume the agent"""
+        self.is_paused.clear()
+        if hasattr(self.agent, 'resume'):
+            self.agent.resume()
 
-# Electron IPC handlers (via stdin input from Electron)
-def handle_commands():
+    def stop(self):
+        """Stop the agent"""
+        self.is_stopped.set()
+        if hasattr(self.agent, 'stop'):
+            self.agent.stop()
+        self.running = False
+
+    def add_task(self, new_task):
+        """Add a new task to the agent"""
+        print("New Task:", new_task)
+        self.agent.add_new_task(new_task)
+        return True
+
+
+def handle_commands(controller):
+    """Handle commands from stdin instead of using a menu"""
     while True:
         command = sys.stdin.readline().strip()
-        print("\ntask_status = ",task_status,"\n")
+        
         if command == "pause":
-            is_paused.set()
-            print("🔄 Agent Paused")
-            if hasattr(agent, "pause"):
-                agent.pause()
+            print('Pausing agent...')
+            controller.pause()
+            
         elif command == "resume":
-            is_paused.clear()
-            print("▶️ Agent Resumed")
-            if hasattr(agent, "resume"):
-                agent.resume()
+            print('Resuming agent...')
+            controller.resume()
+            
         elif command == "stop":
-            is_stopped.set()
-            print("⏹️ Agent Stopping")
-            if hasattr(agent, "stop"):
-                agent.stop()
-            break  # Exit loop when stopped
+            print('Stopping agent...')
+            controller.stop()
+            
+        elif command.startswith("new_task"):
+            new_task = command[len("new_task"):].strip()
+            success = controller.add_task(new_task)
+            if success and controller.is_paused.is_set():
+                print('Resuming agent with new task...')
+                controller.resume()
+                
+        elif command == "exit":
+            print('Exiting...')
+            if controller.running:
+                controller.stop()
+            break
+            
+        else:
+            print('Unknown command. Available commands: pause, resume, stop, new_task, exit')
 
-# Run the command handler in the main thread
-handle_commands()
+
+def main():
+    # Create controller with environment variables
+    controller = AgentController()
+    
+    # Start agent automatically in a separate thread
+    agent_thread = threading.Thread(target=controller.start)
+    agent_thread.daemon = True  # Make thread exit when main program exits
+    agent_thread.start()
+    
+    # Handle commands from stdin
+    handle_commands(controller)
+    
+    # Wait for the agent thread to complete if still running
+    if agent_thread.is_alive():
+        agent_thread.join(timeout=5)
+
+
+if __name__ == '__main__':
+    main()
