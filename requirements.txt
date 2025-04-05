@@ -22,3 +22,4 @@ typing-extensions>=4.12.2
 psutil>=7.0.0
 faiss-cpu>=1.10.0
 mem0ai==0.1.81
+plyer==2.1.0
