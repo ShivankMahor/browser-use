@@ -785,9 +785,10 @@ class Agent(Generic[Context]):
 					# signal_handler.reset()
 
 				# Check if we should stop due to too many failures
-				if self.state.consecutive_failures >= self.settings.max_failures:
-					logger.error(f' Stopping due to {self.settings.max_failures} consecutive failures')
-					break
+				# if self.state.consecutive_failures >= self.settings.max_failures:
+				# logger.error(f' Stopping due to {self.settings.max_failures} consecutive failures')
+				# 	break
+				logger.error(f' Error : max Consecutive failes: {self.settings.max_failures} reached, this is just a warning')
 
 				# Check control flags before each step
 				if self.state.stopped:
@@ -1104,7 +1105,7 @@ class Agent(Generic[Context]):
 	def resume(self) -> None:
 		"""Resume the agent"""
 		print('----------------------------------------------------------------------')
-		print('▶️  Got Enter, resuming agent execution where it left off...\n')
+		print('▶️  Resuming agent execution where it left off...\n')
 		self.state.paused = False
 
 		# The signal handler should have already reset the flags
@@ -1120,8 +1121,10 @@ class Agent(Generic[Context]):
 
 	def stop(self) -> None:
 		"""Stop the agent"""
-		logger.info(' Agent stopping')
-		self.state.stopped = True
+		# logger.info(' Agent stopping')
+		logger.info(' Agent pausing instead of stopping due to functionality changes')
+		self.state.stopped = False
+		self.state.paused = True
 
 	def _convert_initial_actions(self, actions: List[Dict[str, Dict[str, Any]]]) -> List[ActionModel]:
 		"""Convert dictionary-based actions to ActionModel instances"""
