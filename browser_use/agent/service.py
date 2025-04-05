@@ -363,6 +363,7 @@ class Agent(Generic[Context]):
 			return tool_calling_method
 
 	def add_new_task(self, new_task: str) -> None:
+		logger.info("New task given in add_new_task: ")
 		self._message_manager.add_new_task(new_task)
 
 	async def _raise_if_stopped_or_paused(self) -> None:
@@ -752,22 +753,22 @@ class Agent(Generic[Context]):
 	) -> AgentHistoryList:
 		"""Execute the task with maximum number of steps"""
 
-		loop = asyncio.get_event_loop()
+		# loop = asyncio.get_event_loop()
 
 		# Set up the Ctrl+C signal handler with callbacks specific to this agent
-		from browser_use.utils import SignalHandler
+		# from browser_use.utils import SignalHandler
 
-		signal_handler = SignalHandler(
-			loop=loop,
-			pause_callback=self.pause,
-			resume_callback=self.resume,
-			custom_exit_callback=None,  # No special cleanup needed on forced exit
-			exit_on_second_int=True,
-		)
-		signal_handler.register()
+		# signal_handler = SignalHandler(
+		# 	loop=loop,
+		# 	pause_callback=self.pause,
+		# 	resume_callback=self.resume,
+		# 	custom_exit_callback=None,  # No special cleanup needed on forced exit
+		# 	exit_on_second_int=True,
+		# )
+		# signal_handler.register()
 
 		# Start non-blocking LLM connection verification
-		assert await self.llm._verified_api_keys, 'Failed to verify LLM API keys'
+		assert self.llm._verified_api_keys, 'Failed to verify LLM API keys'
 
 		try:
 			self._log_agent_run()
@@ -779,9 +780,9 @@ class Agent(Generic[Context]):
 
 			for step in range(max_steps):
 				# Check if waiting for user input after Ctrl+C
-				if self.state.paused:
-					signal_handler.wait_for_resume()
-					signal_handler.reset()
+				# if self.state.paused:
+					# signal_handler.wait_for_resume()
+					# signal_handler.reset()
 
 				# Check if we should stop due to too many failures
 				if self.state.consecutive_failures >= self.settings.max_failures:
@@ -826,7 +827,7 @@ class Agent(Generic[Context]):
 
 		finally:
 			# Unregister signal handlers before cleanup
-			signal_handler.unregister()
+			# signal_handler.unregister()
 
 			self.telemetry.capture(
 				AgentEndTelemetryEvent(

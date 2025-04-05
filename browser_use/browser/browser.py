@@ -98,11 +98,30 @@ class BrowserConfig(BaseModel):
 	headless: bool = False
 	disable_security: bool = True
 	deterministic_rendering: bool = False
-	keep_alive: bool = Field(default=False, alias='_force_keep_browser_alive')  # used to be called _force_keep_browser_alive
+	keep_alive: bool = Field(default=True, alias='_force_keep_browser_alive')  # used to be called _force_keep_browser_alive
 
 	proxy: ProxySettings | None = None
 	new_context_config: BrowserContextConfig = Field(default_factory=BrowserContextConfig)
 
+# New Field: Chrome Profile Configuration
+	chrome_profile: str | None = None
+
+	def get_browser_args(self) -> list[str]:
+		"""Returns the list of browser args including profile settings"""
+		args = [
+			*CHROME_ARGS,
+			*(CHROME_DOCKER_ARGS if IN_DOCKER else []),
+			*(CHROME_HEADLESS_ARGS if self.headless else []),
+			*(CHROME_DISABLE_SECURITY_ARGS if self.disable_security else []),
+			*(CHROME_DETERMINISTIC_RENDERING_ARGS if self.deterministic_rendering else []),
+			*self.extra_browser_args,
+		]
+
+		# Add the chrome profile directory argument if set
+		# if self.chrome_profile:
+		# 	args.append(f"--profile-directory={self.chrome_profile}")
+
+		return args
 
 # @singleton: TODO - think about id singleton makes sense here
 # @dev By default this is a singleton, but you can create multiple instances if you need to.
@@ -188,20 +207,45 @@ class Browser:
 				)
 				return browser
 		except requests.ConnectionError:
-			logger.debug('🌎  No existing Chrome instance found, starting a new one')
+			logger.info('🌎  No existing Chrome instance found, starting a new one')
 
+		if self.config.chrome_profile:
+			logger.info(f"🌎  Starting a new browser with profile {self.config.chrome_profile}")
+			
+    
+		else:
+			try:
+				# Check if browser is already running
+				response = requests.get('http://localhost:9222/json/version', timeout=2)
+				if response.status_code == 200:
+					logger.info('🔌  Reusing existing browser found running on http://localhost:9222')
+					browser_class = getattr(playwright, self.config.browser_class)
+					browser = await browser_class.connect_over_cdp(
+						endpoint_url='http://localhost:9222',
+						timeout=20000,  # 20 second timeout for connection
+					)
+					return browser
+			except requests.ConnectionError:
+				logger.info('🌎  No existing Chrome instance found, starting a new one')
 		# Start a new Chrome instance
+		chrome_args = self.config.get_browser_args()
+		
 		chrome_launch_cmd = [
-			self.config.browser_binary_path,
-			*{  # remove duplicates (usually preserves the order, but not guaranteed)
-				*CHROME_ARGS,
-				*(CHROME_DOCKER_ARGS if IN_DOCKER else []),
-				*(CHROME_HEADLESS_ARGS if self.config.headless else []),
-				*(CHROME_DISABLE_SECURITY_ARGS if self.config.disable_security else []),
-				*(CHROME_DETERMINISTIC_RENDERING_ARGS if self.config.deterministic_rendering else []),
-				*self.config.extra_browser_args,
-			},
-		]
+        self.config.browser_binary_path,
+        *chrome_args,  # Use the dynamically generated arguments
+    ]
+		# chrome_launch_cmd = [
+		# 	self.config.browser_binary_path,
+		# 	*{  # remove duplicates (usually preserves the order, but not guaranteed)
+		# 		*CHROME_ARGS,
+		# 		*(CHROME_DOCKER_ARGS if IN_DOCKER else []),
+		# 		*(CHROME_HEADLESS_ARGS if self.config.headless else []),
+		# 		*(CHROME_DISABLE_SECURITY_ARGS if self.config.disable_security else []),
+		# 		*(CHROME_DETERMINISTIC_RENDERING_ARGS if self.config.deterministic_rendering else []),
+		# 		*self.config.extra_browser_args,
+		# 	},
+		# ]
+		print(f"Launching Chrome with args: {chrome_launch_cmd}")
 		self._chrome_subprocess = psutil.Process(
 			subprocess.Popen(
 				chrome_launch_cmd,
@@ -234,7 +278,7 @@ class Browser:
 			raise RuntimeError(
 				'To start chrome in Debug mode, you need to close all existing Chrome instances and try again otherwise we can not connect to the instance.'
 			)
-
+	
 	async def _setup_builtin_browser(self, playwright: Playwright) -> PlaywrightBrowser:
 		"""Sets up and returns a Playwright Browser instance with anti-detection measures."""
 		assert self.config.browser_binary_path is None, 'browser_binary_path should be None if trying to use the builtin browsers'
@@ -246,16 +290,17 @@ class Browser:
 			screen_size = get_screen_resolution()
 			offset_x, offset_y = get_window_adjustments()
 
-		chrome_args = {
-			*CHROME_ARGS,
-			*(CHROME_DOCKER_ARGS if IN_DOCKER else []),
-			*(CHROME_HEADLESS_ARGS if self.config.headless else []),
-			*(CHROME_DISABLE_SECURITY_ARGS if self.config.disable_security else []),
-			*(CHROME_DETERMINISTIC_RENDERING_ARGS if self.config.deterministic_rendering else []),
-			f'--window-position={offset_x},{offset_y}',
-			f'--window-size={screen_size["width"]},{screen_size["height"]}',
-			*self.config.extra_browser_args,
-		}
+		chrome_args = self.config.get_browser_args()
+		# chrome_args = {
+		# 	*CHROME_ARGS,
+		# 	*(CHROME_DOCKER_ARGS if IN_DOCKER else []),
+		# 	*(CHROME_HEADLESS_ARGS if self.config.headless else []),
+		# 	*(CHROME_DISABLE_SECURITY_ARGS if self.config.disable_security else []),
+		# 	*(CHROME_DETERMINISTIC_RENDERING_ARGS if self.config.deterministic_rendering else []),
+		# 	f'--window-position={offset_x},{offset_y}',
+		# 	f'--window-size={screen_size["width"]},{screen_size["height"]}',
+		# 	*self.config.extra_browser_args,
+		# }
 
 		# check if port 9222 is already taken, if so remove the remote-debugging-port arg to prevent conflicts
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -291,6 +336,7 @@ class Browser:
 
 	async def _setup_browser(self, playwright: Playwright) -> PlaywrightBrowser:
 		"""Sets up and returns a Playwright Browser instance with anti-detection measures."""
+		logger.info("Called the _setup_browser and cleanup previous browsers ")
 		try:
 			if self.config.cdp_url:
 				return await self._setup_remote_cdp_browser(playwright)
@@ -301,8 +347,10 @@ class Browser:
 				logger.warning('⚠️ Headless mode is not recommended. Many sites will detect and block all headless browsers.')
 
 			if self.config.browser_binary_path:
+				logger.info("Calling _setup_user_provided_browser")
 				return await self._setup_user_provided_browser(playwright)
 			else:
+				logger.info("Calling _setup_builtin_browser")
 				return await self._setup_builtin_browser(playwright)
 		except Exception as e:
 			logger.error(f'Failed to initialize Playwright browser: {e}')
