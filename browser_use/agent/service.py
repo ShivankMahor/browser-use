@@ -792,13 +792,16 @@ class Agent(Generic[Context]):
 
 				# Check control flags before each step
 				if self.state.stopped:
-					logger.info('Agent stopped')
-					break
+					logger.info('Agent stop flag is set to true, changing it back to false so agent dose not stop')
+					self.state.stopped = False
+					# break
 
 				while self.state.paused:
 					await asyncio.sleep(0.2)  # Small delay to prevent CPU spinning
 					if self.state.stopped:  # Allow stopping while paused
-						break
+						logger.info('Agent stop flag is set to true inside pause block, changing it back to false so agent dose not stop')
+						self.state.stopped = False
+						# break
 
 				if on_step_start is not None:
 					await on_step_start(self)
