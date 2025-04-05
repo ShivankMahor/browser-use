@@ -785,10 +785,10 @@ class Agent(Generic[Context]):
 					# signal_handler.reset()
 
 				# Check if we should stop due to too many failures
-				# if self.state.consecutive_failures >= self.settings.max_failures:
+				if self.state.consecutive_failures >= self.settings.max_failures:
 				# logger.error(f' Stopping due to {self.settings.max_failures} consecutive failures')
+					logger.error(f' Error : max Consecutive failes: {self.settings.max_failures} reached, this is just a warning')
 				# 	break
-				logger.error(f' Error : max Consecutive failes: {self.settings.max_failures} reached, this is just a warning')
 
 				# Check control flags before each step
 				if self.state.stopped:
