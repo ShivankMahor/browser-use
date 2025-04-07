@@ -245,6 +245,11 @@ llm = ChatOpenAI(
 env_profile = os.getenv("PROFILE_DIR")
 env_task = os.getenv("TASK")
 
+env_max_step = os.getenv("MAX_STEP")
+if not env_max_step:
+    print("Error Max Steps not defined",env_max_step)
+    sys.exit(1)
+
 def _setup_browser_config(profile):
     """Set up the browser configuration based on OS and profile"""
     if os.name == 'nt':  # Windows
@@ -317,8 +322,12 @@ class AgentController:
         When the agent finishes a task, it will check for follow-up commands."""
         # Run the initial task if provided
         if self.task:
-            print(f"Running initial task: {self.task}")
-            await self.agent.run()
+            # print(f"Running initial task: {self.task}")
+            if not env_max_step:
+                print("Error: Max Steps not defined", env_max_step)
+                sys.exit(1)
+            max_steps = int(env_max_step)
+            await self.agent.run(max_steps=max_steps)
             self.task = None
             # self.agent.add_new_task("Open 2 tabs")
             # await self.agent.run()
@@ -342,7 +351,9 @@ class AgentController:
                     self.agent.add_new_task(self.task)
                     self.task = None
                     print("Running agent with the new task...")
-                    result = await self.agent.run()
+                    currentStep = self.agent.state.n_steps
+                    print("Current Step: ",currentStep)
+                    result = await self.agent.run(max_steps=max_steps+currentStep)
                     print("Agent Result:", result)
                     if result.has_errors():
                         print("Result has errors:", result.errors())
