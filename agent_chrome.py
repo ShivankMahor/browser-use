@@ -232,6 +232,7 @@ import asyncio
 from plyer import notification
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from langchain_ollama import ChatOllama
 from browser_use import Agent, Browser, BrowserConfig, Controller, ActionResult,BrowserContextConfig
 import psutil 
 
@@ -357,8 +358,8 @@ class AgentController:
                     print("Agent Result:", result)
                     if result.has_errors():
                         print("Result has errors:", result.errors())
-                        self.running = False
-                        break
+                        # self.running = False
+                        # break
             else:
                 # Agent is paused; let the global command listener handle resume/stop
                 print("Agent is paused. Awaiting resume command...")

@@ -22,6 +22,10 @@ env_profile = os.getenv("PROFILE_DIR")
 env_task = os.getenv("TASK")
 env_api_key = os.getenv("TOGETHER_API_KEY")
 
+if not env_api_key:
+    print("Error Api key not defined",env_api_key)
+    sys.exit(1)
+
 llm = ChatTogether(
     together_api_key=env_api_key,
     model="meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
