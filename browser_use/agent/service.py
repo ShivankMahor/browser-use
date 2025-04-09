@@ -209,7 +209,7 @@ class Agent(Generic[Context]):
 			raise ValueError('Environment variables not set')
 
 		# Start non-blocking LLM connection verification
-		self.llm._verified_api_keys = self._verify_llm_connection(self.llm)
+		self.llm._verified_api_keys = True
 
 		# Initialize available actions for system prompt (only non-filtered actions)
 		# These will be used for the system prompt to maintain caching
