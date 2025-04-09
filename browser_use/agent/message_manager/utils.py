@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Optional, Type
 
 from langchain_core.messages import (
@@ -16,21 +17,85 @@ from langchain_core.messages import (
 logger = logging.getLogger(__name__)
 
 
+# def extract_json_from_model_output(content: str) -> dict:
+# 	"""Extract JSON from model output, handling both plain JSON and code-block-wrapped JSON."""
+# 	try:
+# 		# If content is wrapped in code blocks, extract just the JSON part
+# 		if '```' in content:
+# 			# Find the JSON content between code blocks
+# 			content = content.split('```')[1]
+# 			# Remove language identifier if present (e.g., 'json\n')
+# 			if '\n' in content:
+# 				content = content.split('\n', 1)[1]
+# 		# Parse the cleaned content
+# 		return json.loads(content)
+# 	except json.JSONDecodeError as e:
+# 		logger.warning(f'Failed to parse model output: {content} {str(e)}')
+# 		raise ValueError('Could not parse response.')
+
+
 def extract_json_from_model_output(content: str) -> dict:
-	"""Extract JSON from model output, handling both plain JSON and code-block-wrapped JSON."""
-	try:
-		# If content is wrapped in code blocks, extract just the JSON part
-		if '```' in content:
-			# Find the JSON content between code blocks
-			content = content.split('```')[1]
-			# Remove language identifier if present (e.g., 'json\n')
-			if '\n' in content:
-				content = content.split('\n', 1)[1]
-		# Parse the cleaned content
-		return json.loads(content)
-	except json.JSONDecodeError as e:
-		logger.warning(f'Failed to parse model output: {content} {str(e)}')
-		raise ValueError('Could not parse response.')
+    logger.info("Extracting JSON from model output...")
+
+    # 1. Extract all blocks inside <|python_start|> and <|python_end|>
+    matches = re.findall(r"<\|python_start\|>(.*?)<\|python_end\|>", content, re.DOTALL)
+    if not matches:
+        logger.warning("No <|python_start|> block found.")
+        raise ValueError("No recognizable JSON block found.")
+
+    for i, block in enumerate(matches):
+        block = block.strip()
+        logger.debug(f"Trying block {i+1}: {block[:200]}...")
+
+        try:
+            # 2. Try parsing the block as JSON
+            parsed = json.loads(block)
+
+            # 3. Handle function call format with stringified "arguments"
+            if isinstance(parsed, dict) and parsed.get("type") == "function":
+                arguments = parsed.get("function", {}).get("arguments")
+                if arguments:
+                    try:
+                        inner = json.loads(arguments)
+                        logger.info("Parsed function arguments successfully.")
+                        return inner
+                    except json.JSONDecodeError:
+                        logger.warning("Function 'arguments' field is not valid JSON.")
+
+            # 4. Handle legacy list-of-functions format
+            if isinstance(parsed, list):
+                for func in parsed:
+                    if func.get("type") == "function":
+                        arguments = func.get("function", {}).get("arguments")
+                        if arguments:
+                            try:
+                                inner = json.loads(arguments)
+                                logger.info("Parsed function list item arguments successfully.")
+                                return inner
+                            except json.JSONDecodeError:
+                                logger.warning("Function list item 'arguments' not valid JSON.")
+
+            # 5. Handle dict with stringified "parameters"
+            if isinstance(parsed, dict) and "parameters" in parsed:
+                try:
+                    parsed["parameters"] = json.loads(parsed["parameters"])
+                    logger.info("Parsed top-level dict with 'parameters'.")
+                    return parsed
+                except json.JSONDecodeError:
+                    logger.warning("'parameters' field is not valid JSON.")
+
+            # 6. If already valid dict structure
+            if isinstance(parsed, dict):
+                logger.info("Parsed direct dict structure.")
+                return parsed
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON decode failed for block {i+1}: {str(e)}")
+
+    # All attempts failed
+    logger.error("All attempts to parse JSON failed.")
+    raise ValueError("Could not parse model output.")
+
 
 
 def convert_input_messages(input_messages: list[BaseMessage], model_name: Optional[str]) -> list[BaseMessage]:
